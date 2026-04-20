@@ -1,12 +1,14 @@
 import asyncio
 import logging
 from datetime import datetime
+import pytz
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from database.db import get_all_users, get_uncompleted_habits
 from keyboards.inline import reminder_habits_keyboard
+from config import DEFAULT_TIMEZONE
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +37,21 @@ async def check_and_send_reminders():
     if _bot is None:
         return
 
-    now = datetime.now()
-    current_time = now.strftime("%H:%M")
-
     try:
         users = await get_all_users()
 
         for user in users:
-            if user["reminder_time"] == current_time:
+            # Получаем текущее время в часовом поясе пользователя
+            user_tz_name = user.get("timezone") or DEFAULT_TIMEZONE
+            try:
+                tz = pytz.timezone(user_tz_name)
+            except Exception:
+                tz = pytz.timezone(DEFAULT_TIMEZONE)
+                
+            now_user = datetime.now(tz)
+            current_time_user = now_user.strftime("%H:%M")
+
+            if user["reminder_time"] == current_time_user:
                 await send_reminder(user["user_id"])
 
     except Exception as e:
